@@ -1,3 +1,3 @@
 export * from './connection.db.js'
-export * from './database.service.js'
-export * from './model/index.js'
+export * from './models/index.js'
+export * from './database.repository.js'

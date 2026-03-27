@@ -3,7 +3,8 @@ import {ENC_BYTE} from '../../../../config/config.service.js'
 const IV_LENGTH = 16;
 const ENCRYPTION_SECRET_KEY = Buffer.from(ENC_BYTE); 
 
-export const encrypt = (text) => {
+export const encrypt = async (text) => {
+    
     const iv = crypto.randomBytes(IV_LENGTH);
     console.log({ ENCRYPTION_SECRET_KEY, iv });
 
@@ -19,7 +20,7 @@ export const encrypt = (text) => {
     return `${iv.toString('hex')}:${encryptedData}`;
 }
 
-export const decrypt = (encryptedData) => {
+export const decrypt = async (encryptedData) => {
     const [iv, encryptedText] = encryptedData.split(":");
 
     const binaryLikeIv = Buffer.from(iv, 'hex');  

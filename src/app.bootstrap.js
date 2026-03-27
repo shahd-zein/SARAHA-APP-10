@@ -1,21 +1,21 @@
-import { NODE_ENV, port } from '../config/config.service.js'
-import {authenticateDB} from './DB/index.js'   
-import { authRouter, userRouter, noteRouter } from './modules/index.js'
-import { globalErrorHandler } from './common/utils/index.js'
+import {  port } from '../config/config.service.js'
+import {connectDB} from './DB/index.js'   
+import { authRouter, userRouter } from './modules/index.js'
+import { globalErrorHandling } from './common/utils/index.js'
 import express from 'express'
+import cors from 'cors'
 
 async function bootstrap() {
     const app = express()
     //convert buffer data
-    app.use(express.json())
+    app.use(cors(),express.json())
 
     //DB
-    await authenticateDB()
+    await connectDB()
     //application routing
     app.get('/', (req, res) => res.send('Hello World!'))
     app.use('/auth', authRouter)
     app.use('/user', userRouter)
-    app.use('/note', noteRouter)
 
 
 //invalid routing
@@ -25,7 +25,7 @@ app.use((req, res) => {
 
 
     //error-handling
-    app.use(globalErrorHandler)
+    app.use(globalErrorHandling)
        
     
     app.listen(port, () => console.log(`Example app listening on port ${port}!`))

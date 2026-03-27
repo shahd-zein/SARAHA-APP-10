@@ -1,38 +1,42 @@
 import { Router } from 'express'
-import {  signup, login, updateUser, deleteUser, getUser } from './auth.service.js';
-import { successResponse } from '../../common/utils/index.js';
-import { authMiddleware } from '../../common/middlewere/auth.middlewere.js';
-const router = Router(); 
+import { signup, login, signupWithGmail } from './auth.service.js';
+import { successResponse } from "../../common/utils/index.js";
+// import joi from 'joi'
+const router = Router();
 
+// const signupSchema = joi.object().keys({
+//   username: joi.string().required(),
+//   email: joi.string().email().required()
+// }).required()
 
 
 
 router.post("/signup", async (req, res, next) => {
-    const account = await signup(req.body)
-    return successResponse({res, statusCode:201, data:{account}})
+  // const account = await (req.body)
+  const account = await signup(req.body)
+  return successResponse({ res, status: 201, data: { account } })
+
 })
 
+
 router.post("/login", async (req, res, next) => {
-    const { user, token } = await login(req.body);
-    return successResponse({ res, statusCode: 200, data: { user, token } });
-  });
+  console.log(`${req.protocol}://${req.host}`);
 
-  router.patch("/users", authMiddleware, async (req, res) => {
-    const userId = req.user.userId; 
-    const updatedUser = await updateUser(userId, req.body);
-    return successResponse({ res, statusCode: 200, data: { user: updatedUser } });
-  });
+  const credentials = await login(req.body, `${req.protocol}://${req.host}`)
+  return successResponse({ res, data: { credentials } })
+})
 
-  router.delete('/users', authMiddleware, async (req, res) => {
-    const deletedUser = await deleteUser(req.user.userId);
-    return successResponse({ res, statusCode: 200, data: { message: "User deleted" } });
-  });
-  
-  
-  router.get('/users', authMiddleware, async (req, res) => {
-    const user = await getUser(req.user.userId);
-    return successResponse({ res, statusCode: 200, data: { user } });
-  });
-  
+
+router.post("/signup/gmail", async (req, res, next) => {
+  console.log("BODY:", req.body);
+
+  const { status, credentials } = await signupWithGmail(
+    req.body.idToken,
+    `${req.protocol}://${req.host}`
+  );
+
+  return successResponse({ res, status, data: { ...credentials } });
+});
+
 
 export default router

@@ -1,6 +1,10 @@
-import {UserModel} from '../../DB/model/index.js'
+import jwt from 'jsonwebtoken'
+import {createLoginCredentials} from "../../common/utils/index.js"
 
-export const profile   = (id)=>{
-    const user = UserModel.find(ele => ele.id == id)
+export const profile = async (user)=>{
     return user
+}
+
+export const rotateToken = async (user, issuer)=>{
+    return createLoginCredentials(user, issuer)
 }
