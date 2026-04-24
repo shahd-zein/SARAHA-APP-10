@@ -1,4 +1,12 @@
-/config/.env.development
-/config/.env.production
+# env files
+config/.env.development
+config/.env.production
+
+# uploads
+uploads/
+
+# node modules
+node_modules/
+
+
 cloudenary.js
-node_modules
