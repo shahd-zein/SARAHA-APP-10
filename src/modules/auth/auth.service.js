@@ -13,7 +13,7 @@ import { ProviderEnum } from "../../common/enums/index.js";
 import { OAuth2Client } from "google-auth-library";
 import { createLoginCredentials } from "../../common/utils/index.js";
 /* =========================
-   AUTHORIZATION MIDDLEWARE
+  AUTHORIZATION MIDDLEWARE
 ========================= */
 
 export const authorization = (accessRoles = []) => {
@@ -72,8 +72,8 @@ export const login = async (inputs, issuer) => {
 
   const user = await findOne({
     model: UserModel,
-    filter: { email, provider:ProviderEnum.System },
-    option:{
+    filter: { email, provider: ProviderEnum.System },
+    option: {
       lean: true
     }
   });
@@ -123,7 +123,7 @@ const verifyGoogleAccount = async (idToken) => {
 
   const ticket = await client.verifyIdToken({
     idToken,
-    audience: "607120472331-be6947da1f7cj0a1kkcqo4737coodjdt.apps.googleusercontent.com" 
+    audience: "607120472331-be6947da1f7cj0a1kkcqo4737coodjdt.apps.googleusercontent.com"
   });
 
   const payload = ticket.getPayload();
@@ -155,7 +155,7 @@ export const loginWithGmail = async (idToken, issuer) => {
   }
 
   return await createLoginCredentials(user, issuer)
-  };
+};
 
 
 /* =========================

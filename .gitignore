@@ -1,3 +1,4 @@
 /config/.env.development
 /config/.env.production
+cloudenary.js
 node_modules

@@ -1,5 +1,5 @@
 import { NODE_ENV } from "../../../../config/config.service.js"
-
+import multer from "multer"
 //general customized error method
 export const ErrorResponse = ({ message = "Error", status = 400, extra = undefined } = {}) => {
     throw new Error(message, { cause: { status, extra } })
@@ -34,9 +34,16 @@ export const globalErrorHandling = (error, req, res, next) => {
     const mood = NODE_ENV == "production";
     const defaultErrorMessage = "something went wrong Sever error";
     const displayErrorMessage = error.message || defaultErrorMessage;
+if (error instanceof multer.MulterError) {
+    return res.status(400).json({
+        message: error.message
+    });
+}
+
     return res.status(status).json({
         status,
         stack: mood ? undefined : error.stack,
+        extra: error?.cause?.extra || undefined,
         errorMessage: mood ? status == 500 ? defaultErrorMessage : displayErrorMessage : displayErrorMessage
     })
 }
