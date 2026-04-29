@@ -1,10 +1,11 @@
 import { port } from '../config/config.service.js'
-import { connectDB } from './DB/index.js'
+import { connctRedis, connectDB } from './DB/index.js'
 import { authRouter, userRouter } from './modules/index.js'
-import { globalErrorHandling } from './common/utils/index.js'
+import { globalErrorHandling, sendEmail } from './common/utils/index.js'
 import express from 'express'
 import cors from 'cors'
 import { resolve } from "node:path";
+import { log } from 'node:console'
 
 async function bootstrap() {
     const app = express()
@@ -12,7 +13,11 @@ async function bootstrap() {
     app.use(cors(), express.json())
 
     //DB
-    await connectDB()
+    await connectDB() 
+    await connctRedis()
+
+
+
     //application routing
     app.get('/', (req, res) => res.send('Hello World!'))
     app.use('/auth', authRouter)
@@ -33,5 +38,5 @@ async function bootstrap() {
     app.listen(port, () => {
         console.log(`Server running on port ${port}`);
     });
- }
+}
 export default bootstrap

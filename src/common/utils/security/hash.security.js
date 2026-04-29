@@ -13,6 +13,7 @@ export const generateHash = async ({ plaintext, salt = SALT_ROUND, minor = 'b', 
         default:
             const generatedSalt = await genSalt(salt, minor)
             hashValue = await hash(plaintext, generatedSalt)
+
             break;
     }
 

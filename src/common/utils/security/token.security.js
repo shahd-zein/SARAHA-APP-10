@@ -11,6 +11,7 @@ import { RoleEnum } from "../../enums/user.enum.js";
 import { MAX_ACCESS_BOUNDARY_RULES_COUNT } from "google-auth-library/build/src/auth/downscopedclient.js";
 import { randomUUID } from 'node:crypto'
 import {tokenModel} from "../../../DB/models/token.model.js"
+import { get, revokeTokenKey } from "../../services/index.js";
 export const generateToken = async ({ payload = {}, secret = USER_ACCESS_TOKEN_SECRET_KEY, options = {} } = {}) => {
     return jwt.sign(payload, secret, options)
 }
@@ -67,7 +68,7 @@ export const decodedToken = async ({ token, tokenType = tokenTypeEnum.Access } =
         throw ConflictException({ message: `unexpected token mechanism we expected ${tokenType} while you have used ${tokenApproach}` })
     }
 
-    if (decoded.jti && await findOne({ model: tokenModel, filter: { jti: decoded.jti } })) {
+    if (decoded.jti && await get(revokeTokenKey({userId:decoded.sub, jti: decoded.jti}))) {
         throw UnauthorizedException({ message: 'Invalid login session' })
 
     }

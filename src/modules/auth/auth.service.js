@@ -5,17 +5,62 @@ import {
   NotFoundException,
   generateHash,
   compareHash,
-  BadRequestException
+  BadRequestException,
+  sendEmail,
+  emailTemplate,
+  emailEvent
 } from "../../common/utils/index.js";
 
 import { UserModel, findOne, createOne } from "../../DB/index.js";
-import { ProviderEnum } from "../../common/enums/index.js";
+import { EmailEnum, ProviderEnum } from "../../common/enums/index.js";
 import { OAuth2Client } from "google-auth-library";
 import { createLoginCredentials } from "../../common/utils/index.js";
+import { blockOtpKey, deleteKey, get, incr, keys, maxAttemptOtpKey, otpKey, set, ttl } from "../../common/services/redis.service.js";
+import { createNumberOtp } from "../../common/utils/index.js";
+
+/* =========================
+  SEND EMAIL OTP 
+========================= */
+const sendEmailOtp = async ({email, subject, title}={})=>{
+    const isBlockedTTL = await ttl(blockOtpKey({ email, subject }))
+  if (isBlockedTTL > 0) {
+    throw BadRequestException({ message: `sorry we can't request new OTP while you are blocked, please try again after${isBlockedTTL}` })
+  }
+
+  const reminingOtpTTL = await ttl(otpKey({ email, subject }))
+  if (reminingOtpTTL > 0) {
+    throw BadRequestException({ message: `sorry we can't request new OTP while current OTP still active, please try again after${reminingOtpTTL}` })
+  }
+
+  const maxTrail = await get(maxAttemptOtpKey({ email, subject }))
+  if (maxTrail >= 3) {
+    await set({
+      key: blockOtpKey({ email, subject }),
+      value: 1,
+      ttl: 7 * 60
+    })
+    throw BadRequestException({message:`you have reached the max trial`})
+  }
+  const code = await createNumberOtp()
+  await set({
+    key: otpKey({ email, subject }),
+    value: await generateHash({ plaintext: `${code}` }),
+    ttl: 120
+  })
+  emailEvent.emit("sendEmail", async ()=>{
+  await sendEmail({
+    to: email,
+    subject,
+    html: emailTemplate({ code, title }),
+  })
+  await incr(maxAttemptOtpKey({ email, subject }))
+})
+}
+
+
 /* =========================
   AUTHORIZATION MIDDLEWARE
 ========================= */
-
 export const authorization = (accessRoles = []) => {
   return async (req, res, next) => {
     try {
@@ -35,7 +80,6 @@ export const authorization = (accessRoles = []) => {
 /* =========================
         SIGNUP
 ========================= */
-
 export const signup = async (inputs) => {
   const { username, email, password, phone } = inputs;
 
@@ -60,19 +104,66 @@ export const signup = async (inputs) => {
     }
   });
 
+  await sendEmailOtp({email, subject:EmailEnum.ConfirmEmail, title:"verify Email"})
   return user;
+};
+
+/* =========================
+        CONFIRMEMAIL
+========================= */
+export const confirmEmail = async (inputs) => {
+  const { email, otp } = inputs;
+
+  const hashOtp = await get(otpKey({email, subject:EmailEnum.ConfirmEmail}))
+  if (!hashOtp) {
+    throw NotFoundException({ message: "Otp Not found" })
+  }
+
+  const account = await findOne({
+    model: UserModel,
+    filter: { email, confirmEmail: { $exists: false }, provider: ProviderEnum.System }
+  });
+  if (!account) {
+    throw NotFoundException({ message: "Fail to find matching account" });
+  }
+  if (!await compareHash({ plaintext: otp, cipherText: hashOtp })) {
+    throw NotFoundException({ message: "Otp Not found" })
+  }
+  account.confirmEmail = new Date();
+  await account.save()
+
+  await deleteKey(await keys(otpKey({email, subject:EmailEnum.ConfirmEmail})))
+  return;
+};
+
+/* =========================
+        RESEND CONFIRMEMAIL
+========================= */
+export const resendConfirmEmail = async (inputs) => {
+  const { email } = inputs;
+
+  const account = await findOne({
+    model: UserModel,
+    filter: { email, confirmEmail: { $exists: false }, provider: ProviderEnum.System }
+  });
+
+  if (!account) {
+    throw NotFoundException({ message: "Fail to find matching account" });
+  }
+
+  await sendEmailOtp({email, subject: EmailEnum.ConfirmEmail, title: "Verify Email"})
+  return;
 };
 
 /* =========================
         LOGIN
 ========================= */
-
 export const login = async (inputs, issuer) => {
   const { email, password } = inputs;
 
   const user = await findOne({
     model: UserModel,
-    filter: { email, provider: ProviderEnum.System },
+    filter: { email, provider: ProviderEnum.System, confirmEmail: { $exists: true } },
     option: {
       lean: true
     }
@@ -95,29 +186,9 @@ export const login = async (inputs, issuer) => {
   return tokens;
 };
 
-
-/*
-{
-    "iss": "https://accounts.google.com",
-    "azp": "607120472331-be6947da1f7cj0a1kkcqo4737coodjdt.apps.googleusercontent.com",
-    "aud": "607120472331-be6947da1f7cj0a1kkcqo4737coodjdt.apps.googleusercontent.com",
-    "sub": "105335545176964410340",
-    "email": "shahdzeinelabdein@gmail.com",
-    "email_verified": true,
-    "nbf": 1774564927,
-    "name": "Shahd Zein",
-    "picture": "https://lh3.googleusercontent.com/a/ACg8ocIfO80fjUKOMyGzscqi_Do41oVobd1B_4RjloPVVIGTOOO0hwle=s96-c",
-    "given_name": "Shahd",
-    "family_name": "Zein",
-    "iat": 1774565227,
-    "exp": 1774568827,
-    "jti": "31d522e655de8ee2dcf3932f5516185a90e13c30"
-} 
-/*
 /* =========================
-   GOOGLE VERIFY FUNCTION
+  GOOGLE VERIFY FUNCTION
 ========================= */
-
 const verifyGoogleAccount = async (idToken) => {
   const client = new OAuth2Client();
 
@@ -136,9 +207,8 @@ const verifyGoogleAccount = async (idToken) => {
 };
 
 /* =========================
-   GOOGLE LOGIN
+  GOOGLE LOGIN
 ========================= */
-
 export const loginWithGmail = async (idToken, issuer) => {
   const payload = await verifyGoogleAccount(idToken);
 
@@ -157,11 +227,9 @@ export const loginWithGmail = async (idToken, issuer) => {
   return await createLoginCredentials(user, issuer)
 };
 
-
 /* =========================
-   GOOGLE SIGNUP
+  GOOGLE SIGNUP
 ========================= */
-
 export const signupWithGmail = async (idToken, issuer) => {
   const payload = await verifyGoogleAccount(idToken);
 

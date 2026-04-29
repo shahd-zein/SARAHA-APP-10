@@ -3,28 +3,32 @@ import { LogoutEnum } from "../../common/enums/security.enum.js";
 import { ConflictException, createLoginCredentials, NotFoundException } from "../../common/utils/index.js"
 import { createOne, tokenModel, UserModel, deleteMany } from '../../DB/index.js'
 import { findOne } from '../../DB/index.js'
+import { set, revokeTokenKey, deleteKey, keys, baseRevokeTokenKey, ttl } from "../../common/services/index.js"
 
-export const logout = async ({ flag }, user, { jti, iat }) => {
+const createRevokeToken = async ({ userId, jti, ttl }) => {
+    await set({
+        key: revokeTokenKey({ userId, jti }),
+        value: jti,
+        ttl
+    })
+}
+
+export const logout = async ({ flag }, user, { jti, iat, sub }) => {
     let status = 200
     switch (flag) {
         case LogoutEnum.All:
             user.changeCredentialsTime = new Date()
             await user.save()
 
-            await deleteMany({
-                model: tokenModel, filter: { userId: user._id }
-            })
+            await deleteKey(await keys(`${baseRevokeTokenKey(sub)}*`))
             break;
 
         default:
-            await createOne({
-                model: tokenModel,
-                data: {
-                    userId: user._id,
-                    jti,
-                    expiresIn: new Date((iat + REFRESH_TOKEN_EXPIRES_IN) * 1000)
-                }
-            })
+            await createRevokeToken({
+                userId: sub,
+                jti,
+                ttl: iat + REFRESH_TOKEN_EXPIRES_IN
+            }) 
             status = 201
             break;
     }
@@ -62,17 +66,14 @@ export const profile = async (user) => {
     return user
 }
 
-export const rotateToken = async (user, { jti, iat }, issuer) => {
-    if (iat + ACCESS_TOKEN_EXPIRES_IN * 1000 >= Date.now() + (30000)) {
-        throw ConflictException({message: "current access token still valid"})
+export const rotateToken = async (user, { sub, jti, iat }, issuer) => {
+    if ((iat + ACCESS_TOKEN_EXPIRES_IN) * 1000 >= Date.now() + (30000)) {
+        throw ConflictException({ message: "current access token still valid" })
     }
-    await createOne({
-        model: tokenModel,
-        data: {
-            userId: user._id,
-            jti,
-            expiresIn: new Date((iat + REFRESH_TOKEN_EXPIRES_IN) * 1000)
-        }
+    await createRevokeToken({
+        userId: sub,
+        jti,
+        ttl: iat + REFRESH_TOKEN_EXPIRES_IN
     })
     return createLoginCredentials(user, issuer)
 }

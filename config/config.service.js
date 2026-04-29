@@ -33,4 +33,13 @@ export const SYSTEM_REFRESH_TOKEN_SECRET_KEY = process.env.SYSTEM_REFRESH_TOKEN_
 export const ACCESS_TOKEN_EXPIRES_IN = parseInt(process.env.ACCESS_TOKEN_EXPIRES_IN);
 export const REFRESH_TOKEN_EXPIRES_IN = parseInt(process.env.REFRESH_TOKEN_EXPIRES_IN);
 
+export const REDIS_URI = process.env.REDIS_URI
 console.log({ DB_URI, SALT_ROUND, USER_ACCESS_TOKEN_SECRET_KEY, USER_REFRESH_TOKEN_SECRET_KEY });
+
+export const EMAIL_APP_PASSWORD = process.env.EMAIL_APP_PASSWORD
+export const EMAIL_APP = process.env.EMAIL_APP
+export const APPLICATION_NAME = process.env.APPLICATION_NAME
+
+export const FACEBOOK_LINK = process.env.FACEBOOK_LINK
+export const INSTAGRAM_LINK = process.env.INSTAGRAM_LINK
+export const TWITTER_LINK = process.env.TWITTER_LINK

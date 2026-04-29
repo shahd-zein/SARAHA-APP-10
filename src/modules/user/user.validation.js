@@ -8,7 +8,7 @@ export const shareProfile = {
     }).required()
 }
 export const profileImage = {
-    file: generalValidationFields.file(fileFieldValidation.image).required()
+    file: generalValidationFields.file(fileFieldValidation.image)
 }
 
 export const coverPicture = {

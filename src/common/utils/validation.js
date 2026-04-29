@@ -10,7 +10,7 @@ export const generalValidationFields = {
     }),
 
     password: joi.string().pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,16}$/),
-
+    otp:joi.string().pattern(new RegExp(/^\d{6}$/)),
     username: joi.string().pattern(/^[A-Za-z]{2,25}\s[A-Za-z]{2,25}$/).messages({
         "any.required": "username is required",
         "string.empty": "username cannot be empty"
