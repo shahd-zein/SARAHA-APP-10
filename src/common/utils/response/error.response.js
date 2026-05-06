@@ -1,16 +1,26 @@
 import { NODE_ENV } from "../../../../config/config.service.js"
 import multer from "multer"
 //general customized error method
-export const ErrorResponse = ({ status, message }) => {
+export const ErrorResponse = ({ status, message, extra = null } = {}) => {
     const error = new Error(message);
+
     error.status = status;
+    error.extra = extra;
+
     return error;
 };
 //error-templates
 
-export const BadRequestException = ({ message = "BadRequestException", extra = undefined } = {}) => {
-    return ErrorResponse({ message, status: 400, extra })
-}
+export const BadRequestException = ({
+    message = "BadRequestException",
+    extra = null
+} = {}) => {
+    return ErrorResponse({
+        message,
+        status: 400,
+        extra
+    });
+};
 export const ConflictException = ({ message = "ConflictException", extra = undefined } = {}) => {
     return ErrorResponse({ message, status: 409, extra })
 }
@@ -48,8 +58,7 @@ export const globalErrorHandling = (error, req, res, next) => {
     return res.status(status).json({
         status,
         stack: mood ? undefined : error.stack,
-        extra: error?.cause?.extra || undefined,
-        errorMessage: mood
+        extra: error?.extra || undefined, errorMessage: mood
             ? status == 500
                 ? defaultErrorMessage
                 : displayErrorMessage

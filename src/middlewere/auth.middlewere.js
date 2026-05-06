@@ -30,22 +30,24 @@ export const authMiddleware = (req, res, next) => {
 };
 export const authentication = (tokenType = tokenTypeEnum.Access) => {
     return async (req, res, next) => {
-        const [schema, credentials] = req.headers.authorization?.split(" ") || []
-        if (!schema || !credentials) {
+        const [key, credentials] = req.headers?.authorization?.split(" ") || []
+        if (!key || !credentials) {
             throw UnauthorizedException
                 ({ message: "Missing authentication key or invalid approach" })
         }
 
-        switch (schema) {
+        switch (key) {
             case "Basic":
-                const data = Buffer.from(credentials, 'base64').toString()?.split(":") || [];
-                await login({ email, password }, `${req.protocol}://${req.host}`)
-                console.log(data)
-            case 'Bearer':
+                const [username, password] = Buffer.from(credentials, 'base64').toString()?.split(":");
+                // const data = Buffer.from(credentials, 'base64').toString()?.split(":") || [];
+                // await login({ email, password }, `${req.protocol}://${req.host}`)
+                console.log({ username, password })
+                break;
+            default:
                 const { user, decoded } = await decodedToken({ token: credentials, tokenType })
                 req.user = user;
                 req.decoded = decoded;
-                break;               
+                break;
         }
         next()
     }

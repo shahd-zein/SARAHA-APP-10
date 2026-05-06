@@ -29,7 +29,8 @@ const userSchema = new mongoose.Schema({
             return this.provider == ProviderEnum.System
         }
     },
-    phone: String,
+    oldPassword:[String],
+    phone: String, 
 
     gender:{
         type: Number,

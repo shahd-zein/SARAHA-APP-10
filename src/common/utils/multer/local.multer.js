@@ -26,5 +26,6 @@ export const localFileUpload = ({
             cb(null, unequeFileName);
         },
     });
-    return multer({ fileFilter: fileFilter(validation),storage, limits:{fileSize: maxSize * 124 * 124} });
+    return multer({ fileFilter: fileFilter(validation),storage,
+         limits:{fileSize: maxSize *  1024 * 1024} });
 };

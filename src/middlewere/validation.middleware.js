@@ -5,8 +5,8 @@ import { BadRequestException } from "../common/utils/response/error.response.js"
 export const validation = (schema) => {
     return (req, res, next) => {
         const errors = []
-        console.log(schema);
-        console.log(Object.keys(schema));
+        // console.log(schema);
+        // console.log(Object.keys(schema));
         for (const key of Object.keys(schema) || []) {
             console.log({ key, schema: schema[key], data: req[key] });
             const validationResult = schema[key].validate(req[key], {

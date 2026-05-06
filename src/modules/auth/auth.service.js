@@ -11,18 +11,18 @@ import {
   emailEvent
 } from "../../common/utils/index.js";
 
-import { UserModel, findOne, createOne } from "../../DB/index.js";
+import { UserModel, findOne, createOne, updateOne, findOneAndUpdate } from "../../DB/index.js";
 import { EmailEnum, ProviderEnum } from "../../common/enums/index.js";
 import { OAuth2Client } from "google-auth-library";
 import { createLoginCredentials } from "../../common/utils/index.js";
-import { blockOtpKey, deleteKey, get, incr, keys, maxAttemptOtpKey, otpKey, set, ttl } from "../../common/services/redis.service.js";
+import { baseRevokeTokenKey, blockOtpKey, deleteKey, get, incr, keys, maxAttemptOtpKey, otpKey, revokeTokenKey, set, ttl } from "../../common/services/redis.service.js";
 import { createNumberOtp } from "../../common/utils/index.js";
 
 /* =========================
   SEND EMAIL OTP 
 ========================= */
-const sendEmailOtp = async ({email, subject, title}={})=>{
-    const isBlockedTTL = await ttl(blockOtpKey({ email, subject }))
+const sendEmailOtp = async ({ email, subject, title } = {}) => {
+  const isBlockedTTL = await ttl(blockOtpKey({ email, subject }))
   if (isBlockedTTL > 0) {
     throw BadRequestException({ message: `sorry we can't request new OTP while you are blocked, please try again after${isBlockedTTL}` })
   }
@@ -39,7 +39,7 @@ const sendEmailOtp = async ({email, subject, title}={})=>{
       value: 1,
       ttl: 7 * 60
     })
-    throw BadRequestException({message:`you have reached the max trial`})
+    throw BadRequestException({ message: `you have reached the max trial` })
   }
   const code = await createNumberOtp()
   await set({
@@ -47,14 +47,14 @@ const sendEmailOtp = async ({email, subject, title}={})=>{
     value: await generateHash({ plaintext: `${code}` }),
     ttl: 120
   })
-  emailEvent.emit("sendEmail", async ()=>{
-  await sendEmail({
-    to: email,
-    subject,
-    html: emailTemplate({ code, title }),
+  emailEvent.emit("sendEmail", async () => {
+    await sendEmail({
+      to: email,
+      subject,
+      html: emailTemplate({ code, title }),
+    })
+    await incr(maxAttemptOtpKey({ email, subject }))
   })
-  await incr(maxAttemptOtpKey({ email, subject }))
-})
 }
 
 
@@ -104,7 +104,7 @@ export const signup = async (inputs) => {
     }
   });
 
-  await sendEmailOtp({email, subject:EmailEnum.ConfirmEmail, title:"verify Email"})
+  await sendEmailOtp({ email, subject: EmailEnum.ConfirmEmail, title: "verify Email" })
   return user;
 };
 
@@ -114,7 +114,9 @@ export const signup = async (inputs) => {
 export const confirmEmail = async (inputs) => {
   const { email, otp } = inputs;
 
-  const hashOtp = await get(otpKey({email, subject:EmailEnum.ConfirmEmail}))
+  const hashOtp = await get(otpKey({ email, subject: EmailEnum.ConfirmEmail }))
+  console.log({hashOtp});
+  
   if (!hashOtp) {
     throw NotFoundException({ message: "Otp Not found" })
   }
@@ -132,7 +134,7 @@ export const confirmEmail = async (inputs) => {
   account.confirmEmail = new Date();
   await account.save()
 
-  await deleteKey(await keys(otpKey({email, subject:EmailEnum.ConfirmEmail})))
+  await deleteKey(await keys(otpKey({ email, subject: EmailEnum.ConfirmEmail })))
   return;
 };
 
@@ -148,13 +150,78 @@ export const resendConfirmEmail = async (inputs) => {
   });
 
   if (!account) {
-    throw NotFoundException({ message: "Fail to find matching account" });
+    throw NotFoundException({ message: "Fail to find matchinisBlockedTTL g account" });
   }
 
-  await sendEmailOtp({email, subject: EmailEnum.ConfirmEmail, title: "Verify Email"})
+  await sendEmailOtp({ email, subject: EmailEnum.ConfirmEmail, title: "Verify Email" })
   return;
 };
 
+/* =========================
+        REQUEST FORGOT PASSWORD
+========================= */
+export const requestForgotPasswordOtp = async (inputs) => {
+  const { email } = inputs;
+
+  const account = await findOne({
+    model: UserModel,
+    filter: {
+      email,
+      confirmEmail: { $exists: true },
+      provider: ProviderEnum.System
+    }
+  });
+
+  if (!account) {
+    throw NotFoundException({ message: "Fail to find matching account" });
+  }
+
+  await sendEmailOtp({ email, subject: EmailEnum.ForgotPassword, title: "Reset Cde" })
+  return;
+};
+
+/* =========================
+        VERIFY FORGOT PASSWORD
+========================= */
+export const verifyForgotPasswordOtp = async (inputs) => {
+  const { email, otp } = inputs;
+
+  const hashOtp = await get(otpKey({ email, subject: EmailEnum.ForgotPassword }))
+  if (!hashOtp) {
+    throw NotFoundException({ message: "Expired OTP" })
+  }
+  if (!await compareHash({ plaintext: otp, cipherText: hashOtp })) {
+    throw ConflictException({ message: "Invalid OTP" })
+  }
+  return;
+};
+
+/* =========================
+        RESET FORGOT PASSWORD
+========================= */
+export const resetForgotPasswordOtp = async (inputs) => {
+  const { email, otp, password } = inputs;
+  await verifyForgotPasswordOtp({ email, otp })
+  const user = await findOneAndUpdate({
+    model: UserModel,
+    filter: {
+      email,
+      confirmEmail: { $exists: true },
+      provider: ProviderEnum.System
+    },
+    update: {
+      password: await generateHash({ plaintext: password }),
+      changeCredentialsTime: new Date()
+    }
+  })
+  if (!user) {
+    throw NotFoundException({ message: "account not exists" })
+  }
+  const tokenKeys = await keys(baseRevokeTokenKey(user._id))
+  const otpKeys = await keys(otpKey({ email, subject: EmailEnum.ForgotPassword }))
+  await deleteKey([...tokenKeys, ...otpKeys])
+  return;
+}; 
 /* =========================
         LOGIN
 ========================= */

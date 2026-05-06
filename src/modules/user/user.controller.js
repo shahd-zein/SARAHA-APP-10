@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { logout,  profile, profileImage, rotateToken, coverPicture } from "./user.service.js";
+import { logout,  profile, profileImage, rotateToken, coverPicture, updatePassword } from "./user.service.js";
 import { successResponse } from "../../common/utils/index.js";
 import { authentication } from "../../middlewere/auth.middlewere.js";
 import { tokenTypeEnum } from "../../common/enums/security.enum.js"
@@ -15,8 +15,16 @@ router.post("/logout", authentication(), async(req, res, next)=>{
     return successResponse({res, status})
 })
 
-router.patch(
-    "/profile-image",
+router.patch("/update-password",
+    authentication(),
+    validation(validators.updatePassword),
+    async (req, res, next) => {
+        const credentials = await updatePassword(req.body, req.user, `${req.protocol}://{req.host}`);
+        return successResponse({ res, data: { ...credentials } });
+    }
+);
+
+router.patch("/profile-image",
     authentication(),
     localFileUpload({
         custumPath: "user/profile",
@@ -30,8 +38,7 @@ router.patch(
     }
 );
 
-router.patch(
-    "/profile-cover-image",
+router.patch("/profile-cover-image",
     authentication(),
     localFileUpload
         ({
@@ -69,6 +76,8 @@ router.post("/rotate-token",
 
         return successResponse({ res, status:201, data:{...credentials}})
     })
+
+
 
 
 
